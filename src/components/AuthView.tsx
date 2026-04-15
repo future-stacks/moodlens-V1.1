@@ -8,10 +8,11 @@ import { toast } from 'sonner';
 interface AuthViewProps {
   onClose: () => void;
   onAuthSuccess: (username: string) => void;
+  initialMode?: 'login' | 'signup';
 }
 
-export function AuthView({ onClose, onAuthSuccess }: AuthViewProps) {
-  const [isLogin, setIsLogin] = useState(true);
+export function AuthView({ onClose, onAuthSuccess, initialMode = 'login' }: AuthViewProps) {
+  const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
