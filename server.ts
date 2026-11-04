@@ -1,14 +1,16 @@
+import "dotenv/config";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import { getIntervention } from "./server/gemini";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
 
@@ -17,18 +19,16 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  app.post("/api/intervention", async (req, res) => {
+    const { mood } = req.body ?? {};
+    if (typeof mood !== "string" || !mood.trim() || mood.length > 100) {
+      return res.status(400).json({ error: "mood must be a non-empty string of at most 100 characters" });
+    }
+    res.json(await getIntervention(mood.trim()));
+  });
+
   // Placeholder for the endpoints requested by the user
   // These will be implemented with Firestore logic once Firebase is set up
-  app.get("/api/intervention", (req, res) => {
-    const { mood } = req.query;
-    res.json({ 
-      mood,
-      action: "Take 3 deep breaths",
-      reframe: "Consistency is better than intensity.",
-      nextStep: "Return to your task.",
-      reflection: "How do you feel now?"
-    });
-  });
 
   app.post("/api/complete-action", (req, res) => {
     res.json({ success: true, streak: 5 });

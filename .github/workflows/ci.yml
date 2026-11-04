@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      # Guard against the Gemini key (or any Google API key) being inlined into the public bundle again.
+      - name: Check bundle for leaked API keys
+        run: |
+          if grep -rEq 'AIza[0-9A-Za-z_-]{35}' dist/; then
+            echo "::error::A Google API key was found in dist/. Secrets must stay server-side."
+            exit 1
+          fi
