@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
-import { ArrowRight, History as HistoryIcon, HelpCircle } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { MoodSelector } from './components/MoodSelector';
+import { History as HistoryIcon, HelpCircle } from 'lucide-react';
+import { CheckInPanel, type CheckInInput } from './components/CheckInPanel';
+import { ReflectPanel } from './components/ReflectPanel';
 import { InterventionCard, type ActionChoice } from './components/InterventionCard';
 import { WeeklyCheckins } from './components/WeeklyCheckins';
 import { Onboarding } from './components/Onboarding';
@@ -13,16 +12,17 @@ import { HelpView } from './components/HelpView';
 import { SupportView } from './components/SupportView';
 import { requestIntervention } from './lib/api';
 import { useMoodLens } from './lib/useMoodLens';
-import { weeklyCount } from './lib/insights';
-import { KEYS } from './lib/storage';
+import { actionTitle, weeklyCount } from './lib/insights';
+import { KEYS, type CheckIn, type Feedback, type FeltAfter } from './lib/storage';
 import type { Intervention } from '../shared/intervention';
 import type { RiskCategory } from '../shared/safeguarding';
 import { moodLabel } from '../shared/moods';
 
 type Screen =
   | { name: 'checkin' }
-  | { name: 'loading'; mood: string }
-  | { name: 'result'; checkInId: string; mood: string; intervention: Intervention; shown: string[] }
+  | { name: 'loading' }
+  | { name: 'result'; checkInId: string; input: CheckInInput; intervention: Intervention; shown: string[] }
+  | { name: 'reflect'; checkInId: string; actionTitle: string }
   | { name: 'support'; category?: RiskCategory; disclosure: boolean };
 
 function readOnboardingSeen() {
@@ -36,50 +36,67 @@ function readOnboardingSeen() {
 export default function App() {
   const store = useMoodLens();
   const [screen, setScreen] = useState<Screen>({ name: 'checkin' });
-  const [customMood, setCustomMood] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !readOnboardingSeen());
   const [showHistory, setShowHistory] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
-  const startCheckIn = async (mood: string) => {
-    setScreen({ name: 'loading', mood });
-    const result = await requestIntervention({ mood, country: store.settings.country });
+  /**
+   * Actions the user previously said weren't helpful. Passed as `exclude` so
+   * future suggestions avoid them. This uses only data already on this device.
+   */
+  const unhelpfulTitles = (checkIns: CheckIn[]) =>
+    checkIns
+      .flatMap((c) => [...(c.notHelpful ?? []), ...(c.feedback === 'not_helpful' && actionTitle(c) ? [actionTitle(c)!] : [])])
+      .slice(-8);
+
+  const startCheckIn = async (input: CheckInInput) => {
+    setScreen({ name: 'loading' });
+    const avoid = unhelpfulTitles(store.checkIns);
+    const result = await requestIntervention({ ...input, exclude: avoid.length ? avoid : undefined, country: store.settings.country });
     if (result.kind === 'support') {
       setScreen({ name: 'support', category: result.category, disclosure: true });
       return;
     }
     const checkInId = crypto.randomUUID();
-    store.upsertCheckIn({ id: checkInId, createdAt: new Date().toISOString(), mood, intervention: result.intervention });
-    setScreen({ name: 'result', checkInId, mood, intervention: result.intervention, shown: [result.intervention.action.title] });
+    store.upsertCheckIn({ id: checkInId, createdAt: new Date().toISOString(), ...input, intervention: result.intervention });
+    setScreen({ name: 'result', checkInId, input, intervention: result.intervention, shown: [...avoid, result.intervention.action.title] });
   };
 
   const handleAnother = async () => {
     if (screen.name !== 'result') return;
     setRefreshing(true);
-    const result = await requestIntervention({ mood: screen.mood, exclude: screen.shown, country: store.settings.country });
+    const result = await requestIntervention({ ...screen.input, exclude: screen.shown.slice(-10), country: store.settings.country });
     setRefreshing(false);
     if (result.kind !== 'intervention') return;
     store.updateCheckIn(screen.checkInId, { intervention: result.intervention });
     setScreen({ ...screen, intervention: result.intervention, shown: [...screen.shown, result.intervention.action.title] });
   };
 
+  const handleNotHelpful = async () => {
+    if (screen.name !== 'result') return;
+    // Remember that this suggestion didn't fit, then offer a different one.
+    const current = store.checkIns.find((c) => c.id === screen.checkInId);
+    store.updateCheckIn(screen.checkInId, { notHelpful: [...(current?.notHelpful ?? []), screen.intervention.action.title] });
+    toast("Thanks for telling us. Here's something different.");
+    await handleAnother();
+  };
+
   const handleComplete = (choice: ActionChoice) => {
     if (screen.name !== 'result') return;
     store.updateCheckIn(screen.checkInId, { actionChoice: choice, completedAt: new Date().toISOString() });
-    toast.success('Nice. That counts.');
+    const action = choice === 'main' ? screen.intervention.action : screen.intervention.alternative_action;
+    setScreen({ name: 'reflect', checkInId: screen.checkInId, actionTitle: action.title });
+  };
+
+  const handleReflect = (result: { feedback?: Feedback; feltAfter?: FeltAfter }) => {
+    if (screen.name !== 'reflect') return;
+    if (result.feedback || result.feltAfter) store.updateCheckIn(screen.checkInId, result);
+    toast.success(result.feedback || result.feltAfter ? 'Saved. Thank you for checking in.' : 'Thank you for checking in.');
     reset();
   };
 
-  const reset = () => {
-    setScreen({ name: 'checkin' });
-    setCustomMood('');
-  };
-
-  const handleCustomMoodSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (customMood.trim()) startCheckIn(customMood.trim());
-  };
+  const reset = () => setScreen({ name: 'checkin' });
 
   const completeOnboarding = () => {
     setShowOnboarding(false);
@@ -137,28 +154,7 @@ export default function App() {
             />
           ) : screen.name === 'checkin' ? (
             <motion.div key="selection" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
-              <div className="space-y-4">
-                <div className="text-center text-[11px] font-bold tracking-[0.2em] text-[#6b6b85] uppercase">Pick a mood</div>
-                <MoodSelector onSelect={startCheckIn} />
-              </div>
-
-              <form onSubmit={handleCustomMoodSubmit} className="mx-auto flex w-full max-w-md gap-3">
-                <Input
-                  value={customMood}
-                  onChange={(e) => setCustomMood(e.target.value)}
-                  maxLength={100}
-                  placeholder="Or type your own mood..."
-                  className="h-12 rounded-full border-white/10 bg-[#13131f] px-6 transition-all focus:border-[#7c6af7]"
-                />
-                <Button
-                  type="submit"
-                  disabled={!customMood.trim()}
-                  className="h-12 rounded-full bg-gradient-to-r from-[#7c6af7] to-[#a78bfa] px-8 font-bold transition-all hover:opacity-90"
-                >
-                  Reflect <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </form>
-
+              <CheckInPanel aiEnabled={store.settings.aiEnabled} onSubmit={startCheckIn} />
               <div className="mx-auto max-w-sm">
                 <WeeklyCheckins count={weeklyCount(store.checkIns)} />
               </div>
@@ -175,15 +171,23 @@ export default function App() {
               <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-[#7c6af7]" aria-hidden />
               <p className="text-sm text-[#a5a5bf]">Finding a thought and a next step for you…</p>
             </motion.div>
+          ) : screen.name === 'reflect' ? (
+            <ReflectPanel
+              key="reflect"
+              actionTitle={screen.actionTitle}
+              onSave={handleReflect}
+              onGetSupport={() => setScreen({ name: 'support', disclosure: false })}
+            />
           ) : (
             <motion.div key={`result-${screen.checkInId}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <InterventionCard
                 key={screen.intervention.action.title}
-                moodLabel={moodLabel(screen.mood)}
+                moodLabel={moodLabel(screen.input.mood)}
                 intervention={screen.intervention}
                 busy={refreshing}
                 onComplete={handleComplete}
                 onAnother={handleAnother}
+                onNotHelpful={handleNotHelpful}
                 onBack={reset}
               />
             </motion.div>

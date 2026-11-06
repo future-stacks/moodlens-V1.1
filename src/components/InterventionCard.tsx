@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Copy, RefreshCw, Clock, Footprints, Feather, BookOpen, Check, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Copy, RefreshCw, Clock, Footprints, Feather, BookOpen, Check, ChevronDown, ThumbsDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { Intervention, Quote } from '../../shared/intervention';
@@ -15,6 +15,8 @@ interface InterventionCardProps {
   onComplete: (choice: ActionChoice) => void;
   onSmaller?: () => void;
   onAnother: () => void;
+  /** Record that this suggestion didn't fit, then offer something different. */
+  onNotHelpful: () => void;
   onBack: () => void;
 }
 
@@ -63,7 +65,7 @@ export function QuoteCard({ quote }: { quote: Quote }) {
   );
 }
 
-export function InterventionCard({ moodLabel, intervention, busy, onComplete, onSmaller, onAnother, onBack }: InterventionCardProps) {
+export function InterventionCard({ moodLabel, intervention, busy, onComplete, onSmaller, onAnother, onNotHelpful, onBack }: InterventionCardProps) {
   const [choice, setChoice] = useState<ActionChoice>('main');
   const [showPrompt, setShowPrompt] = useState(false);
   const active = choice === 'main' ? intervention.action : intervention.alternative_action;
@@ -156,6 +158,16 @@ export function InterventionCard({ moodLabel, intervention, busy, onComplete, on
           >
             <RefreshCw className={`mr-2 h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} aria-hidden />
             Suggest something else
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            className="rounded-full border-white/10 bg-transparent text-[#b8b8d0] hover:bg-white/5 hover:text-white"
+            onClick={onNotHelpful}
+          >
+            <ThumbsDown className="mr-2 h-3.5 w-3.5" aria-hidden />
+            This isn't helpful
           </Button>
           <Button
             variant="outline"

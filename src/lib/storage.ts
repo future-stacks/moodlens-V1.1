@@ -48,6 +48,8 @@ export const CheckInSchema = z.object({
   completedAt: z.string().optional(),
   feedback: FeedbackSchema.optional(),
   feltAfter: FeltAfterSchema.optional(),
+  /** Titles of suggestions the user marked "This isn't helpful" during this check-in. */
+  notHelpful: z.array(z.string()).optional(),
   /** Set for entries migrated from V1.1, which only stored the action text. */
   legacyAction: z.string().optional(),
 });
