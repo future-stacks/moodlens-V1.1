@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Copy, RefreshCw, Clock, Footprints, Feather, BookOpen, Check, ChevronDown, ThumbsDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -68,6 +68,8 @@ export function QuoteCard({ quote }: { quote: Quote }) {
 export function InterventionCard({ moodLabel, intervention, busy, onComplete, onSmaller, onAnother, onNotHelpful, onBack }: InterventionCardProps) {
   const [choice, setChoice] = useState<ActionChoice>('main');
   const [showPrompt, setShowPrompt] = useState(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => headingRef.current?.focus({ preventScroll: true }), []);
   const active = choice === 'main' ? intervention.action : intervention.alternative_action;
 
   const toggleSmaller = () => {
@@ -88,7 +90,7 @@ export function InterventionCard({ moodLabel, intervention, busy, onComplete, on
         <div className="inline-flex items-center gap-2 rounded-full border border-[#7c6af7]/30 bg-[#7c6af7]/15 px-3.5 py-1 text-xs font-bold uppercase tracking-widest text-[#c4b5fd]">
           {moodLabel}
         </div>
-        <h2 id="ack-heading" className="text-2xl font-semibold leading-snug tracking-tight text-white md:text-3xl text-balance">
+        <h2 id="ack-heading" ref={headingRef} tabIndex={-1} className="outline-none text-2xl font-semibold leading-snug tracking-tight text-white md:text-3xl text-balance">
           {intervention.acknowledgement}
         </h2>
         <p className="text-base leading-relaxed text-[#b8b8d0]">{intervention.reflection}</p>

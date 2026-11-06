@@ -138,7 +138,7 @@ describe('privacy controls', () => {
     const fetchMock = mockFetch(() => ({}));
     render(<App />);
 
-    await user.click(screen.getByTitle('Settings'));
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
     const toggle = screen.getByRole('switch', { name: /Personalise with Google Gemini/ });
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     await user.click(toggle);
@@ -158,7 +158,7 @@ describe('privacy controls', () => {
     render(<App />);
     expect(await screen.findByText('You checked in once this week.')).toBeInTheDocument();
 
-    await user.click(screen.getByTitle('Settings'));
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
     await user.click(screen.getByRole('button', { name: /Delete all my data/ }));
     await user.click(screen.getByRole('button', { name: 'Delete everything' }));
 
@@ -180,7 +180,7 @@ describe('history and insights', () => {
     await user.click(await screen.findByRole('radio', { name: 'Yes' }));
     await user.click(screen.getByRole('button', { name: 'Save and finish' }));
 
-    await user.click(await screen.findByTitle('View History'));
+    await user.click(await screen.findByRole('button', { name: 'History' }));
     const dialog = screen.getByRole('dialog', { name: 'Your check-ins' });
     const expected = buildLibraryIntervention({ mood: 'anxious' });
     expect(dialog).toHaveTextContent(expected.action.title);
@@ -188,7 +188,7 @@ describe('history and insights', () => {
     expect(dialog).toHaveTextContent('Helped');
     await user.keyboard('{Escape}');
 
-    await user.click(screen.getByTitle('Insights'));
+    await user.click(screen.getByRole('button', { name: 'Insights' }));
     const insights = await screen.findByRole('dialog', { name: 'Insights' });
     expect(insights).toHaveTextContent('1 check-in');
     expect(insights).toHaveTextContent(expected.action.title);

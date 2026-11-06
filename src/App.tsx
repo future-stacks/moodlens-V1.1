@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { toast } from 'sonner';
 import { History as HistoryIcon, HelpCircle, BarChart3, Settings as SettingsIcon } from 'lucide-react';
 import { CheckInPanel, type CheckInInput } from './components/CheckInPanel';
@@ -53,6 +53,18 @@ export default function App() {
     checkIns
       .flatMap((c) => [...(c.notHelpful ?? []), ...(c.feedback === 'not_helpful' && actionTitle(c) ? [actionTitle(c)!] : [])])
       .slice(-8);
+
+  // Bring each new step of the journey into view (the result can sit below the fold on mobile).
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [screen.name]);
+
+  const navButtons = [
+    { label: 'Help', icon: HelpCircle, onClick: () => setShowHelp(true) },
+    { label: 'History', icon: HistoryIcon, onClick: () => setShowHistory(true) },
+    { label: 'Insights', icon: BarChart3, onClick: () => setShowInsights(true) },
+    { label: 'Settings', icon: SettingsIcon, onClick: () => setShowSettings(true) },
+  ];
 
   const startCheckIn = async (input: CheckInInput) => {
     setScreen({ name: 'loading' });
@@ -112,7 +124,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d0d14] pb-20 font-sans text-[#e8e8f0] selection:bg-[#7c6af7]/30">
+    <MotionConfig reducedMotion="user">
+    <div className="min-h-screen bg-[#0d0d14] pb-16 font-sans text-[#e8e8f0] selection:bg-[#7c6af7]/30">
       <AnimatePresence>
         {showOnboarding && <Onboarding onComplete={completeOnboarding} />}
         {showHistory && <HistoryView checkIns={store.checkIns} onClose={() => setShowHistory(false)} />}
@@ -139,48 +152,44 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <header className="relative mx-auto max-w-2xl space-y-4 px-6 pt-16 pb-12 text-center">
-        <div className="absolute top-16 right-6 flex gap-2">
+      <header className="mx-auto max-w-2xl px-4 pt-5 sm:px-6 sm:pt-8">
+        <nav aria-label="MoodLens" className="flex items-center justify-between gap-3">
           <button
-            onClick={() => setShowHelp(true)}
-            className="rounded-xl border border-white/10 bg-[#13131f] p-2 text-[#6b6b85] transition-all hover:border-[#7c6af7]/50 hover:text-white"
-            title="Help"
+            type="button"
+            onClick={reset}
+            className="rounded-lg px-1 py-2 text-[13px] font-bold tracking-[0.3em] text-[#a78bfa] uppercase focus-visible:outline-2 focus-visible:outline-[#a78bfa]"
           >
-            <HelpCircle className="h-5 w-5" />
+            MoodLens
           </button>
-          <button
-            onClick={() => setShowHistory(true)}
-            className="rounded-xl border border-white/10 bg-[#13131f] p-2 text-[#6b6b85] transition-all hover:border-[#7c6af7]/50 hover:text-white"
-            title="View History"
-          >
-            <HistoryIcon className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => setShowInsights(true)}
-            className="rounded-xl border border-white/10 bg-[#13131f] p-2 text-[#6b6b85] transition-all hover:border-[#7c6af7]/50 hover:text-white"
-            title="Insights"
-          >
-            <BarChart3 className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="rounded-xl border border-white/10 bg-[#13131f] p-2 text-[#6b6b85] transition-all hover:border-[#7c6af7]/50 hover:text-white"
-            title="Settings"
-          >
-            <SettingsIcon className="h-5 w-5" />
-          </button>
-        </div>
+          <div className="flex gap-1.5">
+            {navButtons.map(({ label, icon: Icon, onClick }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={onClick}
+                aria-label={label}
+                title={label}
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#13131f] text-[#a5a5bf] transition-colors hover:border-[#7c6af7]/50 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#a78bfa]"
+              >
+                <Icon className="h-5 w-5" aria-hidden />
+              </button>
+            ))}
+          </div>
+        </nav>
 
-        <div className="text-[13px] font-bold tracking-[0.3em] text-[#7c6af7] uppercase">MoodLens</div>
-        <h1 className="bg-gradient-to-br from-white via-white to-[#7c6af7] bg-clip-text text-4xl leading-[1.1] font-bold tracking-tight text-transparent md:text-6xl">
-          What are you
-          <br />
-          feeling right now?
-        </h1>
-        <p className="text-base text-[#6b6b85] md:text-lg">Turn your mood into a moment of growth — not just a quote.</p>
+        {screen.name === 'checkin' && (
+          <div className="space-y-3 pt-10 pb-10 text-center sm:pt-14">
+            <h1 className="bg-gradient-to-br from-white via-white to-[#a78bfa] bg-clip-text text-4xl leading-[1.1] font-bold tracking-tight text-transparent md:text-6xl">
+              What are you
+              <br />
+              feeling right now?
+            </h1>
+            <p className="text-base text-[#a5a5bf] md:text-lg">Understand how you feel. Find one manageable next step.</p>
+          </div>
+        )}
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-12 px-6">
+      <main className={`mx-auto max-w-4xl px-4 sm:px-6 ${screen.name === 'checkin' ? '' : 'pt-8 sm:pt-12'}`}>
         <AnimatePresence mode="wait">
           {screen.name === 'support' ? (
             <SupportView
@@ -245,8 +254,9 @@ export default function App() {
             Get support now
           </button>
         </p>
-        <p className="text-[11px] font-medium tracking-wider text-[#6b6b85]">Built by Future&amp;Hope · MoodLens 2026</p>
+        <p className="text-[11px] font-medium tracking-wider text-[#8b8ba5]">Built by Future&amp;Hope · MoodLens 2026</p>
       </footer>
     </div>
+    </MotionConfig>
   );
 }
