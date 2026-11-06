@@ -7,7 +7,9 @@ import { Onboarding } from './components/Onboarding';
 import { HistoryView } from './components/HistoryView';
 import { HelpView } from './components/HelpView';
 import { AuthView } from './components/AuthView';
-import { getIntervention } from './lib/gemini';
+import { requestIntervention } from './lib/api';
+import type { Intervention } from '../shared/intervention';
+import { moodLabel } from '../shared/moods';
 import { toast } from 'sonner';
 import { Brain, Sparkles, ArrowRight, History as HistoryIcon, HelpCircle, User as UserIcon, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -23,7 +25,9 @@ interface HistoryItem {
 export default function App() {
   const [mood, setMood] = useState<string | null>(null);
   const [customMood, setCustomMood] = useState('');
-  const [intervention, setIntervention] = useState<any>(null);
+  const [intervention, setIntervention] = useState<Intervention | null>(null);
+  const [shownActions, setShownActions] = useState<string[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [streak, setStreak] = useState(0);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -75,15 +79,19 @@ export default function App() {
   const handleMoodSelect = async (selectedMood: string) => {
     setMood(selectedMood);
     setLoading(true);
-    
-    try {
-      const data = await getIntervention(selectedMood);
-      setIntervention(data);
-    } catch (error) {
-      toast.error("Failed to generate intervention.");
-    } finally {
-      setLoading(false);
-    }
+    const { intervention: data } = await requestIntervention({ mood: selectedMood });
+    setIntervention(data);
+    setShownActions([data.action.title]);
+    setLoading(false);
+  };
+
+  const handleAnother = async () => {
+    if (!mood) return;
+    setRefreshing(true);
+    const { intervention: data } = await requestIntervention({ mood, exclude: shownActions });
+    setIntervention(data);
+    setShownActions((prev) => [...prev, data.action.title]);
+    setRefreshing(false);
   };
 
   const handleCustomMoodSubmit = (e?: React.FormEvent) => {
@@ -93,7 +101,8 @@ export default function App() {
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = (choice: 'main' | 'alternative') => {
+    if (!intervention) return;
     const newStreak = streak + 1;
     setStreak(newStreak);
     const now = new Date().toISOString();
@@ -101,7 +110,7 @@ export default function App() {
     const newHistoryItem: HistoryItem = {
       id: crypto.randomUUID(),
       mood: mood || 'custom',
-      action: intervention.action,
+      action: (choice === 'main' ? intervention.action : intervention.alternative_action).title,
       timestamp: now
     };
     
@@ -272,12 +281,13 @@ export default function App() {
               exit={{ opacity: 0 }}
             >
               {intervention && (
-                <InterventionCard 
-                  mood={mood}
-                  intervention={intervention} 
+                <InterventionCard
+                  moodLabel={moodLabel(mood)}
+                  intervention={intervention}
+                  busy={refreshing}
                   onComplete={handleComplete}
-                  onReset={handleReset}
-                  onRefresh={() => handleMoodSelect(mood)}
+                  onAnother={handleAnother}
+                  onBack={handleReset}
                 />
               )}
             </motion.div>
