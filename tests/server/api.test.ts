@@ -56,3 +56,46 @@ describe('safeguarding on POST /api/intervention', () => {
     expect(res.body.kind).toBe('support');
   });
 });
+
+describe('API hardening', () => {
+  it('returns JSON 404 for unknown API routes instead of the SPA', async () => {
+    const res = await request(app).get('/api/nope');
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'not_found' });
+  });
+
+  it('returns JSON 400 for malformed JSON without leaking a stack trace', async () => {
+    const res = await request(app).post('/api/intervention').set('Content-Type', 'application/json').send('{bad');
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'invalid_json' });
+  });
+
+  it('rejects oversized bodies', async () => {
+    const res = await request(app).post('/api/intervention').send({ mood: 'sad', note: 'x'.repeat(20_000) });
+    expect(res.status).toBe(413);
+  });
+
+  it('sets security headers and hides the framework', async () => {
+    const res = await request(createApp({ generate: null, production: true })).get('/api/health');
+    expect(res.headers['x-powered-by']).toBeUndefined();
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['content-security-policy']).toContain("frame-ancestors 'none'");
+    expect(res.headers['strict-transport-security']).toBeDefined();
+  });
+
+  it('rate-limits the intervention endpoint per client', async () => {
+    const limited = createApp({ generate: null, rateLimitPerMinute: 2 });
+    for (let i = 0; i < 2; i++) {
+      expect((await request(limited).post('/api/intervention').send({ mood: 'sad' })).status).toBe(200);
+    }
+    const res = await request(limited).post('/api/intervention').send({ mood: 'sad' });
+    expect(res.status).toBe(429);
+    expect(res.body).toEqual({ error: 'rate_limited' });
+  });
+
+  it('no longer exposes the placeholder streak endpoints', async () => {
+    expect((await request(app).get('/api/streak')).status).toBe(404);
+    expect((await request(app).post('/api/complete-action')).status).toBe(404);
+    expect((await request(app).post('/api/mood-log')).status).toBe(404);
+  });
+});
