@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: { alias: { '@': path.resolve(__dirname, '.') } },
   test: {
     include: ['tests/**/*.test.{ts,tsx}'],
+    exclude: ['e2e/**', 'node_modules/**'],
     environment: 'node',
     setupFiles: ['tests/setup.ts'],
     restoreMocks: true,

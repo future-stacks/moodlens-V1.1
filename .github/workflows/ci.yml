@@ -4,14 +4,19 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -26,13 +31,25 @@ jobs:
       - name: Type-check
         run: npm run lint
 
-      - name: Build
+      - name: Unit and API tests
+        run: npm test
+
+      - name: Build (client + server)
         run: npm run build
 
       # Guard against the Gemini key (or any Google API key) being inlined into the public bundle again.
       - name: Check bundle for leaked API keys
         run: |
-          if grep -rEq 'AIza[0-9A-Za-z_-]{35}' dist/; then
-            echo "::error::A Google API key was found in dist/. Secrets must stay server-side."
+          if grep -rEq 'AIza[0-9A-Za-z_-]{35}' dist/ dist-server/; then
+            echo "::error::A Google API key was found in the build output. Secrets must stay server-side."
             exit 1
           fi
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end and accessibility tests
+        run: npm run test:e2e
