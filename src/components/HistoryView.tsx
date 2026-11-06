@@ -3,19 +3,16 @@ import { motion } from 'motion/react';
 import { History, Calendar, CheckCircle2, X } from 'lucide-react';
 import { format } from 'date-fns';
 
-interface HistoryItem {
-  id: string;
-  mood: string;
-  action: string;
-  timestamp: string;
-}
+import type { CheckIn } from '../lib/storage';
+import { actionTitle } from '../lib/insights';
+import { moodLabel } from '../../shared/moods';
 
 interface HistoryViewProps {
-  history: HistoryItem[];
+  checkIns: CheckIn[];
   onClose: () => void;
 }
 
-export function HistoryView({ history, onClose }: HistoryViewProps) {
+export function HistoryView({ checkIns: history, onClose }: HistoryViewProps) {
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -59,16 +56,16 @@ export function HistoryView({ history, onClose }: HistoryViewProps) {
               >
                 <div className="flex items-center justify-between">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#7c6af7]/10 border border-[#7c6af7]/20 text-[#a78bfa] text-[10px] font-bold uppercase tracking-wider">
-                    {item.mood}
+                    {moodLabel(item.mood)}
                   </div>
                   <div className="text-[10px] text-[#6b6b85] font-medium">
-                    {format(new Date(item.timestamp), 'MMM d, h:mm a')}
+                    {format(new Date(item.createdAt), 'MMM d, h:mm a')}
                   </div>
                 </div>
                 <div className="flex gap-3">
                   <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
                   <p className="text-sm text-[#b8b8d0] leading-relaxed">
-                    {item.action}
+                    {actionTitle(item) ?? 'No action recorded'}
                   </p>
                 </div>
               </div>

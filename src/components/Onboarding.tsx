@@ -24,7 +24,7 @@ const steps = [
   },
   {
     title: "Build Momentum",
-    description: "Maintain your streak by completing daily actions. Consistency is the antidote to overthinking.",
+    description: "Small steps add up. MoodLens shows how often you've checked in this week, with no streaks to break and nothing to lose if you take a day off.",
     icon: Flame,
     color: "text-orange-500",
     bg: "bg-orange-500/10"

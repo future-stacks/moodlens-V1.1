@@ -18,8 +18,8 @@ const faqs = [
     icon: Zap
   },
   {
-    question: "How do streaks work?",
-    answer: "Complete at least one micro-intervention every 24 hours to maintain your streak. If you miss a day, the system resets to help you focus on the next small win rather than past failures.",
+    question: "Is there a streak?",
+    answer: "No. MoodLens shows how many times you've checked in this week. Nothing resets and nothing is lost if you take time away. Use it when it helps.",
     icon: Flame
   },
   {
