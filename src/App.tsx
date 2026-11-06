@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
-import { History as HistoryIcon, HelpCircle } from 'lucide-react';
+import { History as HistoryIcon, HelpCircle, BarChart3, Settings as SettingsIcon } from 'lucide-react';
 import { CheckInPanel, type CheckInInput } from './components/CheckInPanel';
 import { ReflectPanel } from './components/ReflectPanel';
 import { InterventionCard, type ActionChoice } from './components/InterventionCard';
@@ -9,6 +9,8 @@ import { WeeklyCheckins } from './components/WeeklyCheckins';
 import { Onboarding } from './components/Onboarding';
 import { HistoryView } from './components/HistoryView';
 import { HelpView } from './components/HelpView';
+import { InsightsView } from './components/InsightsView';
+import { SettingsView } from './components/SettingsView';
 import { SupportView } from './components/SupportView';
 import { requestIntervention } from './lib/api';
 import { useMoodLens } from './lib/useMoodLens';
@@ -40,6 +42,8 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(() => !readOnboardingSeen());
   const [showHistory, setShowHistory] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   /**
    * Actions the user previously said weren't helpful. Passed as `exclude` so
@@ -53,7 +57,7 @@ export default function App() {
   const startCheckIn = async (input: CheckInInput) => {
     setScreen({ name: 'loading' });
     const avoid = unhelpfulTitles(store.checkIns);
-    const result = await requestIntervention({ ...input, exclude: avoid.length ? avoid : undefined, country: store.settings.country });
+    const result = await requestIntervention({ ...input, exclude: avoid.length ? avoid : undefined, country: store.settings.country }, { ai: store.settings.aiEnabled });
     if (result.kind === 'support') {
       setScreen({ name: 'support', category: result.category, disclosure: true });
       return;
@@ -66,7 +70,7 @@ export default function App() {
   const handleAnother = async () => {
     if (screen.name !== 'result') return;
     setRefreshing(true);
-    const result = await requestIntervention({ ...screen.input, exclude: screen.shown.slice(-10), country: store.settings.country });
+    const result = await requestIntervention({ ...screen.input, exclude: screen.shown.slice(-10), country: store.settings.country }, { ai: store.settings.aiEnabled });
     setRefreshing(false);
     if (result.kind !== 'intervention') return;
     store.updateCheckIn(screen.checkInId, { intervention: result.intervention });
@@ -112,7 +116,27 @@ export default function App() {
       <AnimatePresence>
         {showOnboarding && <Onboarding onComplete={completeOnboarding} />}
         {showHistory && <HistoryView checkIns={store.checkIns} onClose={() => setShowHistory(false)} />}
-        {showHelp && <HelpView onClose={() => setShowHelp(false)} />}
+        {showInsights && <InsightsView checkIns={store.checkIns} onClose={() => setShowInsights(false)} />}
+        {showSettings && (
+          <SettingsView
+            settings={store.settings}
+            onChange={store.setSettings}
+            onDeleteAll={() => {
+              store.clearAll();
+              reset();
+            }}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
+        {showHelp && (
+          <HelpView
+            onClose={() => setShowHelp(false)}
+            onGetSupport={() => {
+              setShowHelp(false);
+              setScreen({ name: 'support', disclosure: false });
+            }}
+          />
+        )}
       </AnimatePresence>
 
       <header className="relative mx-auto max-w-2xl space-y-4 px-6 pt-16 pb-12 text-center">
@@ -130,6 +154,20 @@ export default function App() {
             title="View History"
           >
             <HistoryIcon className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => setShowInsights(true)}
+            className="rounded-xl border border-white/10 bg-[#13131f] p-2 text-[#6b6b85] transition-all hover:border-[#7c6af7]/50 hover:text-white"
+            title="Insights"
+          >
+            <BarChart3 className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="rounded-xl border border-white/10 bg-[#13131f] p-2 text-[#6b6b85] transition-all hover:border-[#7c6af7]/50 hover:text-white"
+            title="Settings"
+          >
+            <SettingsIcon className="h-5 w-5" />
           </button>
         </div>
 

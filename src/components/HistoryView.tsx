@@ -1,78 +1,94 @@
 import React from 'react';
-import { motion } from 'motion/react';
-import { History, Calendar, CheckCircle2, X } from 'lucide-react';
 import { format } from 'date-fns';
-
+import { History, Calendar, Feather, Footprints } from 'lucide-react';
+import { Dialog } from './Dialog';
 import type { CheckIn } from '../lib/storage';
 import { actionTitle } from '../lib/insights';
 import { moodLabel } from '../../shared/moods';
 
-interface HistoryViewProps {
-  checkIns: CheckIn[];
-  onClose: () => void;
+const FEEDBACK_LABEL = { helpful: 'Helped', somewhat: 'Helped a little', not_helpful: "Didn't help" } as const;
+const FELT_LABEL = { better: 'Felt a bit better', same: 'Felt about the same', worse: 'Felt worse' } as const;
+
+function Tag({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'neutral' | 'good' }) {
+  return (
+    <span
+      className={
+        tone === 'good'
+          ? 'rounded-full bg-[#7dd3c0]/10 px-2.5 py-0.5 text-xs text-[#9fe3d3]'
+          : 'rounded-full bg-white/5 px-2.5 py-0.5 text-xs text-[#b8b8d0]'
+      }
+    >
+      {children}
+    </span>
+  );
 }
 
-export function HistoryView({ checkIns: history, onClose }: HistoryViewProps) {
+export function HistoryEntry({ item }: { item: CheckIn }) {
+  const action = actionTitle(item);
+  const quote = item.intervention?.quote;
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#0d0d14]/90 backdrop-blur-sm"
-    >
-      <motion.div 
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        className="bg-[#13131f] border border-white/10 rounded-[32px] p-8 max-w-md w-full h-[80vh] shadow-2xl relative flex flex-col"
-      >
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#f76a8a]/10 rounded-xl">
-              <History className="w-6 h-6 text-[#f76a8a]" />
-            </div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">History</h2>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-2 text-[#6b6b85] hover:text-white transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+    <li className="space-y-3 rounded-2xl border border-white/5 bg-white/[0.03] p-5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="rounded-full border border-[#7c6af7]/25 bg-[#7c6af7]/10 px-3 py-1 text-xs font-bold tracking-wider text-[#c4b5fd] uppercase">
+          {moodLabel(item.mood)}
+        </span>
+        <time dateTime={item.createdAt} className="text-xs text-[#8b8ba5]">
+          {format(new Date(item.createdAt), 'EEE d MMM, HH:mm')}
+        </time>
+      </div>
 
-        <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-          {history.length === 0 ? (
-            <div className="text-center py-20 space-y-4">
-              <div className="p-4 bg-white/5 rounded-full w-fit mx-auto">
-                <Calendar className="w-8 h-8 text-[#6b6b85]" />
-              </div>
-              <p className="text-[#6b6b85] font-medium">No interventions yet.<br/>Complete your first action to see it here.</p>
-            </div>
-          ) : (
-            history.slice().reverse().map((item) => (
-              <div 
-                key={item.id}
-                className="bg-white/5 border border-white/5 rounded-2xl p-5 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#7c6af7]/10 border border-[#7c6af7]/20 text-[#a78bfa] text-[10px] font-bold uppercase tracking-wider">
-                    {moodLabel(item.mood)}
-                  </div>
-                  <div className="text-[10px] text-[#6b6b85] font-medium">
-                    {format(new Date(item.createdAt), 'MMM d, h:mm a')}
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
-                  <p className="text-sm text-[#b8b8d0] leading-relaxed">
-                    {actionTitle(item) ?? 'No action recorded'}
-                  </p>
-                </div>
-              </div>
-            ))
-          )}
+      {quote && (
+        <p className="flex gap-2 text-sm leading-relaxed text-[#d4d4e4]">
+          <Feather className="mt-0.5 h-4 w-4 shrink-0 text-[#a78bfa]" aria-hidden />
+          <span>
+            “{quote.text}”{quote.type === 'curated_quote' && <span className="text-[#8b8ba5]"> — {quote.author}</span>}
+          </span>
+        </p>
+      )}
+
+      {action && (
+        <p className="flex gap-2 text-sm leading-relaxed text-[#b8b8d0]">
+          <Footprints className="mt-0.5 h-4 w-4 shrink-0 text-[#7dd3c0]" aria-hidden />
+          <span>
+            {item.completedAt ? '' : 'Suggested: '}
+            {action}
+          </span>
+        </p>
+      )}
+
+      {(item.completedAt || item.feedback || item.feltAfter) && (
+        <div className="flex flex-wrap gap-1.5">
+          {item.completedAt && <Tag tone="good">Done</Tag>}
+          {item.feedback && <Tag tone={item.feedback === 'not_helpful' ? 'neutral' : 'good'}>{FEEDBACK_LABEL[item.feedback]}</Tag>}
+          {item.feltAfter && <Tag>{FELT_LABEL[item.feltAfter]}</Tag>}
         </div>
-      </motion.div>
-    </motion.div>
+      )}
+    </li>
+  );
+}
+
+export function HistoryView({ checkIns, onClose }: { checkIns: CheckIn[]; onClose: () => void }) {
+  const items = [...checkIns].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return (
+    <Dialog title="Your check-ins" icon={History} iconClassName="bg-[#f76a8a]/10 text-[#f76a8a]" onClose={onClose}>
+      {items.length === 0 ? (
+        <div className="space-y-4 py-16 text-center">
+          <div className="mx-auto w-fit rounded-full bg-white/5 p-4">
+            <Calendar className="h-8 w-8 text-[#8b8ba5]" aria-hidden />
+          </div>
+          <p className="text-[#a5a5bf]">
+            Nothing here yet.
+            <br />
+            Your check-ins will appear here, stored only in this browser.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {items.map((item) => (
+            <HistoryEntry key={item.id} item={item} />
+          ))}
+        </ul>
+      )}
+    </Dialog>
   );
 }

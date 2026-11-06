@@ -13,17 +13,25 @@ export type InterventionResult =
  * so the user always gets a thought and an action.
  *
  * Safeguarding runs first, locally: text that suggests someone may be at risk
- * is never sent to the server or the AI provider.
+ * is never sent to the server or the AI provider. With `ai: false` nothing is
+ * sent at all.
  */
-export async function requestIntervention(req: CheckInRequest, signal?: AbortSignal): Promise<InterventionResult> {
+export async function requestIntervention(
+  req: CheckInRequest,
+  options: { ai?: boolean; signal?: AbortSignal } = {},
+): Promise<InterventionResult> {
   const risk = assessRisk(req.mood, req.note);
   if (risk.level === "high") return { kind: "support", category: risk.category };
+  // AI suggestions switched off: build the response on-device; nothing is sent.
+  if (options.ai === false) {
+    return { kind: "intervention", intervention: buildLibraryIntervention(req, req.exclude?.length ?? 0) };
+  }
   try {
     const res = await fetch("/api/intervention", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
-      signal,
+      signal: options.signal,
     });
     if (res.ok) {
       const body = await res.json();

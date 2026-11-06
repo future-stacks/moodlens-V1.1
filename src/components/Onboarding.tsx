@@ -1,109 +1,65 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Brain, Zap, Flame, History, ArrowRight, X } from 'lucide-react';
+import { Brain, Feather, Footprints, ShieldCheck, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
-interface OnboardingProps {
-  onComplete: () => void;
-}
+import { Dialog } from './Dialog';
 
 const steps = [
   {
-    title: "Welcome to MoodLens",
-    description: "A habit support tool for high-performing individuals. We focus on action over reflection.",
+    title: 'Welcome to MoodLens',
+    description:
+      'From emotional clarity to meaningful action. Check in with how you feel, and MoodLens helps you understand it and find a next step.',
     icon: Brain,
-    color: "text-[#7c6af7]",
-    bg: "bg-[#7c6af7]/10"
+    color: 'text-[#a78bfa] bg-[#7c6af7]/10',
   },
   {
-    title: "Mood → Action",
-    description: "Tell us how you feel, and we'll give you a micro-intervention that takes less than 2 minutes.",
-    icon: Zap,
-    color: "text-yellow-500",
-    bg: "bg-yellow-500/10"
+    title: 'A thought for how you feel',
+    description: 'Each check-in includes a thought chosen for your mood. Quotations always show their real author, and original reflections are labelled as MoodLens reflections.',
+    icon: Feather,
+    color: 'text-[#f0a3b5] bg-[#f76a8a]/10',
   },
   {
-    title: "Build Momentum",
-    description: "Small steps add up. MoodLens shows how often you've checked in this week, with no streaks to break and nothing to lose if you take a day off.",
-    icon: Flame,
-    color: "text-orange-500",
-    bg: "bg-orange-500/10"
+    title: 'One manageable step',
+    description: "Then one practical action, usually 2, 5 or 10 minutes, with a smaller option if it feels like too much. Nothing is lost if you skip it.",
+    icon: Footprints,
+    color: 'text-[#7dd3c0] bg-[#7dd3c0]/10',
   },
   {
-    title: "Track Your Growth",
-    description: "View your history of interventions to see patterns in your state and how you overcame them.",
-    icon: History,
-    color: "text-[#f76a8a]",
-    bg: "bg-[#f76a8a]/10"
-  }
+    title: 'Your privacy',
+    description:
+      "Your check-ins stay in this browser. To personalise suggestions, check-in content is sent to Google's Gemini AI service. You can turn this off in Settings. MoodLens is not a medical or emergency service.",
+    icon: ShieldCheck,
+    color: 'text-[#fcd34d] bg-yellow-500/10',
+  },
 ];
 
-export function Onboarding({ onComplete }: OnboardingProps) {
-  const [currentStep, setCurrentStep] = useState(0);
-
-  const next = () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      onComplete();
-    }
-  };
-
-  const step = steps[currentStep];
+export function Onboarding({ onComplete }: { onComplete: () => void }) {
+  const [current, setCurrent] = useState(0);
+  const step = steps[current];
+  const last = current === steps.length - 1;
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#0d0d14]/90 backdrop-blur-sm"
-    >
-      <motion.div 
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        className="bg-[#13131f] border border-white/10 rounded-[32px] p-8 max-w-sm w-full shadow-2xl relative overflow-hidden"
-      >
-        <button 
-          onClick={onComplete}
-          className="absolute top-6 right-6 text-[#6b6b85] hover:text-white transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="space-y-8">
-          <div className="flex justify-center">
-            <div className={`p-6 rounded-3xl ${step.bg}`}>
-              <step.icon className={`w-12 h-12 ${step.color}`} />
-            </div>
-          </div>
-
-          <div className="text-center space-y-3">
-            <h2 className="text-2xl font-bold text-white tracking-tight">{step.title}</h2>
-            <p className="text-[#6b6b85] text-sm leading-relaxed">
-              {step.description}
-            </p>
-          </div>
-
-          <div className="flex justify-center gap-1.5">
-            {steps.map((_, i) => (
-              <div 
-                key={i}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  i === currentStep ? "w-8 bg-[#7c6af7]" : "w-1.5 bg-white/10"
-                }`}
-              />
-            ))}
-          </div>
-
-          <Button 
-            onClick={next}
-            className="w-full h-14 rounded-2xl bg-[#7c6af7] hover:bg-[#6b58e6] text-white font-bold text-lg shadow-lg shadow-purple-900/20"
-          >
-            {currentStep === steps.length - 1 ? "Get Started" : "Next"}
-            <ArrowRight className="w-5 h-5 ml-2" />
-          </Button>
+    <Dialog title={step.title} onClose={onComplete} hideTitle className="sm:max-w-sm">
+      <div className="space-y-7 pt-2 text-center" aria-live="polite">
+        <div className={`mx-auto w-fit rounded-3xl p-6 ${step.color}`}>
+          <step.icon className="h-11 w-11" aria-hidden />
         </div>
-      </motion.div>
-    </motion.div>
+        <div className="space-y-3">
+          <p className="text-2xl font-bold tracking-tight text-white">{step.title}</p>
+          <p className="text-sm leading-relaxed text-[#b8b8d0]">{step.description}</p>
+        </div>
+        <div className="flex justify-center gap-1.5" aria-label={`Step ${current + 1} of ${steps.length}`} role="img">
+          {steps.map((_, i) => (
+            <span key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === current ? 'w-8 bg-[#7c6af7]' : 'w-1.5 bg-white/15'}`} />
+          ))}
+        </div>
+        <Button
+          onClick={() => (last ? onComplete() : setCurrent(current + 1))}
+          className="h-14 w-full rounded-2xl bg-[#7c6af7] text-lg font-bold text-white shadow-lg shadow-purple-900/20 hover:bg-[#6b58e6]"
+        >
+          {last ? 'Get started' : 'Next'}
+          <ArrowRight className="ml-2 h-5 w-5" aria-hidden />
+        </Button>
+      </div>
+    </Dialog>
   );
 }

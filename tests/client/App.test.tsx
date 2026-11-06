@@ -131,3 +131,67 @@ describe('legacy data', () => {
     await waitFor(() => expect(localStorage.getItem('moodlens_users')).toBeNull());
   });
 });
+
+describe('privacy controls', () => {
+  it('sends nothing to the server when AI suggestions are turned off', async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch(() => ({}));
+    render(<App />);
+
+    await user.click(screen.getByTitle('Settings'));
+    const toggle = screen.getByRole('switch', { name: /Personalise with Google Gemini/ });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Lonely/ }));
+    await user.click(screen.getByRole('button', { name: /Find my next step/ }));
+    expect(await screen.findByText('Your next step')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('deletes all local data after confirmation', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('moodlens_history', JSON.stringify([{ id: 'l1', mood: 'sad', action: 'Walk', timestamp: new Date().toISOString() }]));
+    render(<App />);
+    expect(await screen.findByText('You checked in once this week.')).toBeInTheDocument();
+
+    await user.click(screen.getByTitle('Settings'));
+    await user.click(screen.getByRole('button', { name: /Delete all my data/ }));
+    await user.click(screen.getByRole('button', { name: 'Delete everything' }));
+
+    expect(loadCheckIns()).toHaveLength(0);
+    expect(localStorage.getItem('moodlens_history')).toBeNull();
+    expect(screen.getByText(/No check-ins yet this week/)).toBeInTheDocument();
+  });
+});
+
+describe('history and insights', () => {
+  it('lists past check-ins with the thought and action, and summarises them descriptively', async () => {
+    const user = userEvent.setup();
+    mockFetch((body) => ({ kind: 'intervention', intervention: buildLibraryIntervention(body) }));
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /Anxious/ }));
+    await user.click(screen.getByRole('button', { name: /Find my next step/ }));
+    await user.click(await screen.findByRole('button', { name: /I did it/ }));
+    await user.click(await screen.findByRole('radio', { name: 'Yes' }));
+    await user.click(screen.getByRole('button', { name: 'Save and finish' }));
+
+    await user.click(await screen.findByTitle('View History'));
+    const dialog = screen.getByRole('dialog', { name: 'Your check-ins' });
+    const expected = buildLibraryIntervention({ mood: 'anxious' });
+    expect(dialog).toHaveTextContent(expected.action.title);
+    expect(dialog).toHaveTextContent(expected.quote.text);
+    expect(dialog).toHaveTextContent('Helped');
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByTitle('Insights'));
+    const insights = await screen.findByRole('dialog', { name: 'Insights' });
+    expect(insights).toHaveTextContent('1 check-in');
+    expect(insights).toHaveTextContent(expected.action.title);
+    expect(insights).toHaveTextContent(/not a diagnosis/);
+  });
+});

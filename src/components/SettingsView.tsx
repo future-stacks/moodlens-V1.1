@@ -1,169 +1,151 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { Settings, X, Bell, Clock, Trash2, Shield, BellOff } from 'lucide-react';
+import React, { useState } from 'react';
+import { Settings as SettingsIcon, Download, Trash2, Globe, Sparkles, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { Dialog } from './Dialog';
+import { exportData, type Settings } from '../lib/storage';
+import { COUNTRY_OPTIONS } from '../../shared/supportResources';
 
 interface SettingsViewProps {
+  settings: Settings;
+  onChange: (patch: Partial<Settings>) => void;
+  onDeleteAll: () => void;
   onClose: () => void;
-  onClearHistory: () => void;
 }
 
-export function SettingsView({ onClose, onClearHistory }: SettingsViewProps) {
-  const [reminderTime, setReminderTime] = useState('09:00');
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>('default');
+function Heading({ icon: Icon, children }: { icon: typeof Globe; children: React.ReactNode }) {
+  return (
+    <h3 className="flex items-center gap-2 text-xs font-bold tracking-[0.18em] text-[#a78bfa] uppercase">
+      <Icon className="h-4 w-4" aria-hidden />
+      {children}
+    </h3>
+  );
+}
 
-  useEffect(() => {
-    const savedTime = localStorage.getItem('moodlens_reminder_time');
-    if (savedTime) setReminderTime(savedTime);
+export function SettingsView({ settings, onChange, onDeleteAll, onClose }: SettingsViewProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-    if ('Notification' in window) {
-      setPermissionStatus(Notification.permission);
-      setNotificationsEnabled(Notification.permission === 'granted');
-    }
-  }, []);
-
-  const handleSaveTime = () => {
-    localStorage.setItem('moodlens_reminder_time', reminderTime);
-    toast.success(`Reminder set for ${reminderTime}`);
-  };
-
-  const requestNotificationPermission = async () => {
-    if (!('Notification' in window)) {
-      toast.error("This browser does not support notifications.");
-      return;
-    }
-
-    try {
-      const permission = await Notification.requestPermission();
-      setPermissionStatus(permission);
-      if (permission === 'granted') {
-        setNotificationsEnabled(true);
-        toast.success("Notifications enabled!");
-        
-        // Test notification
-        new Notification("MoodLens", {
-          body: "Reminders are now active. We'll help you stay consistent.",
-          icon: "/favicon.ico"
-        });
-      } else {
-        setNotificationsEnabled(false);
-        toast.error("Notification permission denied.");
-      }
-    } catch (error) {
-      toast.error("Failed to request permission. Try opening in a new tab.");
-    }
-  };
-
-  const confirmClearHistory = () => {
-    if (window.confirm("Are you sure you want to clear all history and streaks? This cannot be undone.")) {
-      onClearHistory();
-      onClose();
-    }
+  const download = () => {
+    const blob = new Blob([JSON.stringify(exportData(), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `moodlens-data-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#0d0d14]/90 backdrop-blur-sm"
-    >
-      <motion.div 
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        className="bg-[#13131f] border border-white/10 rounded-[32px] p-8 max-w-md w-full shadow-2xl relative flex flex-col"
-      >
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#7c6af7]/10 rounded-xl">
-              <Settings className="w-6 h-6 text-[#7c6af7]" />
-            </div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">Settings</h2>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-2 text-[#6b6b85] hover:text-white transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="flex-1 space-y-8 overflow-y-auto pr-2 custom-scrollbar">
-          {/* Reminders Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-[#7c6af7]">
-              <Clock className="w-4 h-4" />
-              <h3 className="text-xs font-bold uppercase tracking-widest">Daily Reminder</h3>
-            </div>
-            <div className="flex gap-3">
-              <Input 
-                type="time"
-                value={reminderTime}
-                onChange={(e) => setReminderTime(e.target.value)}
-                className="bg-white/5 border-white/10 h-12 rounded-xl focus:border-[#7c6af7] text-white"
-              />
-              <Button 
-                onClick={handleSaveTime}
-                className="h-12 px-6 rounded-xl bg-[#7c6af7] hover:bg-[#6b58e6] text-white font-bold"
-              >
-                Save
-              </Button>
-            </div>
-            <p className="text-[11px] text-[#6b6b85]">
-              Set a target time for your daily check-in to maintain your streak.
-            </p>
-          </div>
-
-          {/* Notifications Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-[#7c6af7]">
-              <Bell className="w-4 h-4" />
-              <h3 className="text-xs font-bold uppercase tracking-widest">Notifications</h3>
-            </div>
-            <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-white">Browser Notifications</p>
-                <p className="text-xs text-[#6b6b85]">
-                  {permissionStatus === 'granted' ? 'Enabled' : 'Currently disabled'}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={requestNotificationPermission}
-                className={`rounded-full border-white/10 ${notificationsEnabled ? 'text-green-500' : 'text-[#7c6af7]'}`}
-              >
-                {notificationsEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-                <span className="ml-2">{notificationsEnabled ? 'Active' : 'Enable'}</span>
-              </Button>
-            </div>
-            {permissionStatus === 'denied' && (
-              <p className="text-[10px] text-red-400/70 italic">
-                Notifications are blocked by your browser. Please enable them in your site settings.
+    <Dialog title="Settings & privacy" icon={SettingsIcon} onClose={onClose}>
+      <div className="space-y-8">
+        <section className="space-y-3">
+          <Heading icon={Sparkles}>AI suggestions</Heading>
+          <div className="flex items-start justify-between gap-4 rounded-2xl bg-white/[0.03] p-4">
+            <div className="space-y-1">
+              <p id="ai-label" className="text-sm font-medium text-white">
+                Personalise with Google Gemini
               </p>
-            )}
-          </div>
-
-          {/* Data Management */}
-          <div className="space-y-4 pt-4 border-t border-white/5">
-            <div className="flex items-center gap-2 text-red-400">
-              <Shield className="w-4 h-4" />
-              <h3 className="text-xs font-bold uppercase tracking-widest">Danger Zone</h3>
+              <p id="ai-desc" className="text-xs leading-relaxed text-[#a5a5bf]">
+                When on, what you choose and write in a check-in is sent to Google's Gemini AI service to write your reflection and
+                suggestion. When off, nothing leaves this device and suggestions come from MoodLens' built-in library.
+              </p>
             </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={settings.aiEnabled}
+              aria-labelledby="ai-label"
+              aria-describedby="ai-desc"
+              onClick={() => onChange({ aiEnabled: !settings.aiEnabled })}
+              className={`relative mt-1 h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#a78bfa] ${
+                settings.aiEnabled ? 'bg-[#7c6af7]' : 'bg-white/15'
+              }`}
+            >
+              <span
+                className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white transition-transform ${settings.aiEnabled ? 'translate-x-5' : ''}`}
+                aria-hidden
+              />
+            </button>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <Heading icon={Globe}>Support resources</Heading>
+          <label htmlFor="country" className="block text-sm text-[#d4d4e4]">
+            Show emergency and support numbers for
+          </label>
+          <select
+            id="country"
+            value={settings.country}
+            onChange={(e) => onChange({ country: e.target.value })}
+            className="h-12 w-full rounded-xl border border-white/10 bg-[#0d0d14] px-4 text-white focus:border-[#7c6af7] focus:outline-none"
+          >
+            {COUNTRY_OPTIONS.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-[#8b8ba5]">More countries will be added once their services have been verified.</p>
+        </section>
+
+        <section className="space-y-3">
+          <Heading icon={ShieldCheck}>Your data</Heading>
+          <ul className="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-[#b8b8d0]">
+            <li>Your check-ins, reflections and settings are stored only in this browser. There is no MoodLens account.</li>
+            <li>
+              With AI suggestions on, each check-in (the feeling, any context you add and your note) is sent through the MoodLens
+              server to Google Gemini to generate a response. The MoodLens server does not store it. Google processes it under the Gemini API terms that apply to MoodLens.
+            </li>
+            <li>MoodLens does not use your check-ins to train AI models, and doesn't sell or share your data.</li>
+            <li>Clearing your browser data also removes your MoodLens history.</li>
+          </ul>
+          <Button
+            variant="outline"
+            onClick={download}
+            className="h-11 w-full rounded-xl border-white/10 bg-transparent text-[#d4d4e4] hover:bg-white/5 hover:text-white"
+          >
+            <Download className="mr-2 h-4 w-4" aria-hidden />
+            Download my data (JSON)
+          </Button>
+
+          {!confirmDelete ? (
             <Button
               variant="outline"
-              onClick={confirmClearHistory}
-              className="w-full h-12 rounded-xl border-red-500/20 text-red-400 hover:bg-red-500/10 hover:border-red-500/50 transition-all"
+              onClick={() => setConfirmDelete(true)}
+              className="h-11 w-full rounded-xl border-red-500/25 bg-transparent text-red-300 hover:bg-red-500/10"
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Clear All Data
+              <Trash2 className="mr-2 h-4 w-4" aria-hidden />
+              Delete all my data
             </Button>
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
+          ) : (
+            <div role="alert" className="space-y-3 rounded-2xl border border-red-500/30 bg-red-500/5 p-4">
+              <p className="text-sm text-red-100">
+                This permanently deletes every check-in and setting stored in this browser. It can't be undone.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    onDeleteAll();
+                    setConfirmDelete(false);
+                    toast.success('All MoodLens data on this device has been deleted.');
+                  }}
+                  className="h-10 flex-1 rounded-xl bg-red-500 font-semibold text-white hover:bg-red-600"
+                >
+                  Delete everything
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirmDelete(false)}
+                  className="h-10 flex-1 rounded-xl border-white/10 bg-transparent text-[#d4d4e4] hover:bg-white/5"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+    </Dialog>
   );
 }
