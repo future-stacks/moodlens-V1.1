@@ -1,15 +1,23 @@
 import { InterventionSchema, type CheckInRequest, type Intervention } from "../../shared/intervention";
 import { buildLibraryIntervention } from "../../shared/library";
+import { assessRisk, type RiskCategory } from "../../shared/safeguarding";
 
-export type InterventionResult = { kind: "intervention"; intervention: Intervention };
+export type InterventionResult =
+  | { kind: "intervention"; intervention: Intervention }
+  | { kind: "support"; category?: RiskCategory };
 
 /**
  * Ask the server for an intervention. The response is validated against the
  * shared contract. If the server can't be reached or replies with something
  * unexpected, a complete response is built from the local library instead,
  * so the user always gets a thought and an action.
+ *
+ * Safeguarding runs first, locally: text that suggests someone may be at risk
+ * is never sent to the server or the AI provider.
  */
 export async function requestIntervention(req: CheckInRequest, signal?: AbortSignal): Promise<InterventionResult> {
+  const risk = assessRisk(req.mood, req.note);
+  if (risk.level === "high") return { kind: "support", category: risk.category };
   try {
     const res = await fetch("/api/intervention", {
       method: "POST",
@@ -19,6 +27,7 @@ export async function requestIntervention(req: CheckInRequest, signal?: AbortSig
     });
     if (res.ok) {
       const body = await res.json();
+      if (body?.kind === "support") return { kind: "support", category: body.category };
       if (body?.kind === "intervention") {
         const parsed = InterventionSchema.safeParse(body.intervention);
         if (parsed.success) return { kind: "intervention", intervention: parsed.data };

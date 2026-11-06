@@ -1,5 +1,6 @@
 import express from "express";
 import { CheckInRequestSchema } from "../shared/intervention";
+import { assessRisk } from "../shared/safeguarding";
 import { getIntervention, type GenerateFn } from "./gemini";
 
 export interface AppOptions {
@@ -20,6 +21,13 @@ export function createApp(options: AppOptions = {}) {
     const parsed = CheckInRequestSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       return res.status(400).json({ error: "invalid_request", details: parsed.error.issues.map((i) => i.path.join(".") || "body") });
+    }
+    // Safeguarding runs before any AI call. High-risk disclosures never reach the
+    // AI provider and never receive a quote + action.
+    const risk = assessRisk(parsed.data.mood, parsed.data.note);
+    if (risk.level === "high") {
+      console.warn(JSON.stringify({ level: "warn", msg: "safeguarding_triggered", category: risk.category }));
+      return res.json({ kind: "support", category: risk.category });
     }
     const intervention = await getIntervention(parsed.data, options.generate);
     res.json({ kind: "intervention", intervention });

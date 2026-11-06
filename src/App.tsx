@@ -7,6 +7,8 @@ import { Onboarding } from './components/Onboarding';
 import { HistoryView } from './components/HistoryView';
 import { HelpView } from './components/HelpView';
 import { AuthView } from './components/AuthView';
+import { SupportView } from './components/SupportView';
+import type { RiskCategory } from '../shared/safeguarding';
 import { requestIntervention } from './lib/api';
 import type { Intervention } from '../shared/intervention';
 import { moodLabel } from '../shared/moods';
@@ -28,6 +30,7 @@ export default function App() {
   const [intervention, setIntervention] = useState<Intervention | null>(null);
   const [shownActions, setShownActions] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [support, setSupport] = useState<{ category?: RiskCategory; disclosure: boolean } | null>(null);
   const [loading, setLoading] = useState(false);
   const [streak, setStreak] = useState(0);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -79,19 +82,25 @@ export default function App() {
   const handleMoodSelect = async (selectedMood: string) => {
     setMood(selectedMood);
     setLoading(true);
-    const { intervention: data } = await requestIntervention({ mood: selectedMood });
-    setIntervention(data);
-    setShownActions([data.action.title]);
+    const result = await requestIntervention({ mood: selectedMood });
     setLoading(false);
+    if (result.kind === 'support') {
+      setMood(null);
+      setSupport({ category: result.category, disclosure: true });
+      return;
+    }
+    setIntervention(result.intervention);
+    setShownActions([result.intervention.action.title]);
   };
 
   const handleAnother = async () => {
     if (!mood) return;
     setRefreshing(true);
-    const { intervention: data } = await requestIntervention({ mood, exclude: shownActions });
-    setIntervention(data);
-    setShownActions((prev) => [...prev, data.action.title]);
+    const result = await requestIntervention({ mood, exclude: shownActions });
     setRefreshing(false);
+    if (result.kind !== 'intervention') return;
+    setIntervention(result.intervention);
+    setShownActions((prev) => [...prev, result.intervention.action.title]);
   };
 
   const handleCustomMoodSubmit = (e?: React.FormEvent) => {
@@ -222,7 +231,9 @@ export default function App() {
 
       <main className="max-w-4xl mx-auto px-6 space-y-12">
         <AnimatePresence mode="wait">
-          {!mood ? (
+          {support ? (
+            <SupportView key="support" category={support.category} disclosure={support.disclosure} onBack={() => setSupport(null)} />
+          ) : !mood ? (
             <motion.div
               key="selection"
               initial={{ opacity: 0 }}
@@ -297,6 +308,12 @@ export default function App() {
 
       <footer className="mt-20 text-center space-y-4 px-6">
         <div className="h-px bg-white/5 max-w-md mx-auto" />
+        <p className="text-xs text-[#8b8ba5]">
+          MoodLens is not a medical or emergency service.{' '}
+          <button type="button" onClick={() => setSupport({ disclosure: false })} className="font-medium text-[#7dd3c0] underline underline-offset-4">
+            Get support now
+          </button>
+        </p>
         <p className="text-[11px] font-medium tracking-wider text-[#6b6b85]">
           Built by Future&Hope · Built as a habit experiment · MoodLens 2026
         </p>

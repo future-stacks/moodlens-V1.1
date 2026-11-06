@@ -34,3 +34,25 @@ describe('POST /api/intervention', () => {
     expect(res.body.error).toBe('invalid_request');
   });
 });
+
+describe('safeguarding on POST /api/intervention', () => {
+  it('returns a support response and never calls the AI for high-risk text', async () => {
+    let called = false;
+    const guarded = createApp({
+      generate: async () => {
+        called = true;
+        return '{}';
+      },
+    });
+    const res = await request(guarded).post('/api/intervention').send({ mood: 'sad', note: "I don't want to be alive" });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ kind: 'support', category: 'self_harm' });
+    expect(res.body.intervention).toBeUndefined();
+    expect(called).toBe(false);
+  });
+
+  it('checks the typed mood as well as the note', async () => {
+    const res = await request(app).post('/api/intervention').send({ mood: 'suicidal' });
+    expect(res.body.kind).toBe('support');
+  });
+});
